@@ -7,7 +7,6 @@ const PORT = process.env.PORT || 3000;
 app.use((req, res, next) => {
   console.log('Incoming request:', req.method, req.url);
 
-  // Expect URL in query param 'url', e.g. /?url=https://example.com
   const targetUrl = req.query.url;
 
   if (!targetUrl) {
@@ -22,15 +21,31 @@ app.use((req, res, next) => {
 
   console.log('Proxying to:', targetUrl);
 
-  // Create proxy middleware dynamically for this target
   const proxy = createProxyMiddleware({
     target: targetUrl,
     changeOrigin: true,
     selfHandleResponse: false,
-    onProxyReq: (proxyReq) => {
+    secure: true, // verify SSL certs
+    onProxyReq: (proxyReq, req, res) => {
       console.log('Setting headers on proxy request');
-      proxyReq.setHeader('origin', 'https://yourappdomain.com'); // replace with your actual domain
-      proxyReq.setHeader('x-requested-with', 'XMLHttpRequest');
+
+      // Set realistic User-Agent to avoid blocks
+      proxyReq.setHeader(
+        'User-Agent',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+      );
+
+      // Pass some common headers to mimic browser behavior
+      if (req.headers.referer) {
+        proxyReq.setHeader('Referer', req.headers.referer);
+      }
+      if (req.headers.cookie) {
+        proxyReq.setHeader('Cookie', req.headers.cookie);
+      }
+
+      // Your custom headers (optional)
+      proxyReq.setHeader('Origin', 'https://yourappdomain.com'); // Replace with your domain
+      proxyReq.setHeader('X-Requested-With', 'XMLHttpRequest');
     },
     onProxyRes: (proxyRes, req, res) => {
       console.log(`Received response from target: ${proxyRes.statusCode} ${proxyRes.statusMessage}`);
